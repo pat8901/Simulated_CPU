@@ -1,0 +1,121 @@
+GAS LISTING max_n_min.s 			page 1
+
+
+   1              	#VARIABLES: The registers have the following uses:
+   2              	#
+   3              	# %edi - Holds the index of the data item being examined
+   4              	# %ebx - Largest data item found
+   5              	# %eax - Current data item
+   6              	#
+   7              	# The following memory locations are used:
+   8              	#
+   9              	# data_items - contains the item data.  A 0 is used
+  10              	#              to terminate the data
+  11              	#
+  12              	
+  13              	 .section .data
+  14              	
+  15              	maximum_number:			  #Prints maximum number found
+  16 0000 4D617869 	 .ascii "Maximum number found is %d\n\0"
+  16      6D756D20 
+  16      6E756D62 
+  16      65722066 
+  16      6F756E64 
+  17              	
+  18              	minimum_number:			  #Prints minimum number found
+  19 001c 4D696E69 	 .ascii "Minimum number found is %d\n\0"
+  19      6D756D20 
+  19      6E756D62 
+  19      65722066 
+  19      6F756E64 
+  20              	
+  21              	data_items:                       #These are the data items
+  22 0038 03000000 	 .long 3,67,34,222,45,75,54,34,44,33,22,11,66,0
+  22      43000000 
+  22      22000000 
+  22      DE000000 
+  22      2D000000 
+  23              	
+  24              	 .section .text
+  25              	 .globl _start
+  26              	
+  27              	_start:
+  28 0000 BF000000 	 movl $0, %edi             # move 0 into the index register
+  28      00
+  29 0005 8B04BD38 	 movl data_items(,%edi,4), %eax # load the first byte of data
+  29      000000
+  30 000c 89C3     	 movl %eax, %ebx           # since this is the first item, %eax is
+  31              				   # the biggest
+  32              	
+  33              	start_loop:                # start loop
+  34 000e 83F800   	 cmpl $0, %eax             # check to see if we’ve hit the end
+  35 0011 7410     	 je loop_exit
+  36 0013 47       	 incl %edi                 # load next value
+  37 0014 8B04BD38 	 movl data_items(,%edi,4), %eax
+  37      000000
+  38 001b 39D8     	 cmpl %ebx, %eax           # compare values
+  39 001d 7EEF     	 jle start_loop            # jump to loop beginning if the new
+  40              				   # one isn’t bigger
+  41 001f 89C3     	 movl %eax, %ebx           # move the value as the largest
+  42 0021 EBEB     	 jmp start_loop            # jump to loop beginning
+GAS LISTING max_n_min.s 			page 2
+
+
+  43              	
+  44              	loop_exit:
+  45              	# %ebx is the status code for the exit system call
+  46              	# and it already has the maximum number
+  47              	
+  48 0023 53       	 pushl %ebx
+  49 0024 68000000 	 pushl $maximum_number
+  49      00
+  50 0029 E8FCFFFF 	 call printf
+  50      FF
+  51 002e EB00     	 jmp start_minimum	# jump to minimum block
+  52              	
+  53              	start_minimum:
+  54 0030 BF000000 	 movl $0, %edi             # move 0 into the index register
+  54      00
+  55 0035 8B04BD38 	 movl data_items(,%edi,4), %eax # load the first byte of data
+  55      000000
+  56 003c 89C3     	 movl %eax, %ebx           # since this is the first item, %eax is
+  57              	                           # the smallest
+  58              	
+  59              	start_loop_minimum:
+  60 003e 83F800   	 cmpl $0, %eax             # check to see if we’ve hit the end
+  61 0041 7410     	 je minimum_exit
+  62 0043 47       	 incl %edi                 # load next value
+  63 0044 8B04BD38 	 movl data_items(,%edi,4), %eax
+  63      000000
+  64 004b 39D8     	 cmpl %ebx, %eax           # compare values
+  65 004d 7DEF     	 jge start_loop_minimum    # jump to loop beginning if the new
+  66              	                           # one isn’t smaller
+  67 004f 89C3     	 movl %eax, %ebx           # move the value as the smallest
+  68 0051 EBEB     	 jmp start_loop_minimum    # jump to loop beginning
+  69              	
+  70              	minimum_exit:
+  71 0053 53       	 pushl %ebx
+  72 0054 681C0000 	 pushl $minimum_number
+  72      00
+  73 0059 E8FCFFFF 	 call printf
+  73      FF
+  74              	
+  75 005e B8010000 	 movl $1, %eax             #1 is the exit() syscall
+  75      00
+  76 0063 CD80     	 int  $0x80
+GAS LISTING max_n_min.s 			page 3
+
+
+DEFINED SYMBOLS
+         max_n_min.s:15     .data:0000000000000000 maximum_number
+         max_n_min.s:18     .data:000000000000001c minimum_number
+         max_n_min.s:21     .data:0000000000000038 data_items
+         max_n_min.s:27     .text:0000000000000000 _start
+         max_n_min.s:33     .text:000000000000000e start_loop
+         max_n_min.s:44     .text:0000000000000023 loop_exit
+         max_n_min.s:53     .text:0000000000000030 start_minimum
+         max_n_min.s:59     .text:000000000000003e start_loop_minimum
+         max_n_min.s:70     .text:0000000000000053 minimum_exit
+
+UNDEFINED SYMBOLS
+printf

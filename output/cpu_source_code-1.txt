@@ -1,0 +1,304 @@
+GAS LISTING cpuFun.s 			page 1
+
+
+   1              	   .section .data
+   2              	#==========================================================
+   3              	#
+   4              	#   Simulator Memory, 16bit address, 64K max
+   5              	#
+   6              	#==========================================================
+   7              	smem:
+   8              	    .rept 65536/2
+   9              	    .byte 0x26,0x10
+  10 0000 26102610 	    .endr
+  10      26102610 
+  10      26102610 
+  10      26102610 
+  10      26102610 
+  11              	#==========================================================
+  12              	#
+  13              	#   Simulator registers, 16 32-bit registers
+  14              	#   Initialized to zero on "boot"
+  15              	#
+  16              	#==========================================================
+  17              	regs:
+  18 10000 00000000 	    .long 0
+  19 10004 01000000 	    .long 1
+  20              	    .rept 14
+  21              	    .long 0
+  22 10008 00000000 	    .endr
+  22      00000000 
+  22      00000000 
+  22      00000000 
+  22      00000000 
+  23              	#==========================================================
+  24              	#
+  25              	#   Operation dispatch table, one/op-code, 256 max
+  26              	#
+  27              	#   Rd=Destination Register (0-15)
+  28              	#   Rs=Source Register (0-15)
+  29              	#   Memory has a 16-bit address space, high-order
+  30              	#   bits of any indirect operation discarded
+  31              	#
+  32              	#==========================================================
+  33              	optbl:
+  34 10040 DB000000 	    .long   snop        #00 Robot init
+  35 10044 DB000000 	    .long   snop        #01 Read Sensors
+  36 10048 DB000000 	    .long   snop        #02 Robot Speed, Rr,Rl
+  37 1004c DB000000 	    .long   snop        #03 Robot Speed Imm
+  38              	
+  39 10050 1D000000 	   .long    ldr      #04 ld Rd,Rs
+  40              	
+  41 10054 DB000000 	   .long    snop    #05
+  42 10058 DB000000 	   .long    snop    #06
+  43 1005c DB000000 	   .long    snop    #07
+  44 10060 DB000000 	   .long    snop    #08
+  45 10064 DB000000 	   .long    snop    #09
+  46 10068 DB000000 	   .long    snop    #0A
+  47 1006c DB000000 	   .long    snop    #0B
+  48              	
+  49 10070 43000000 	   .long    andr    #0C and Rd,Rs
+GAS LISTING cpuFun.s 			page 2
+
+
+  50              	
+  51 10074 DB000000 	   .long    snop    #0D
+  52 10078 DB000000 	   .long    snop    #0E
+  53 1007c DB000000 	   .long    snop    #0F
+  54 10080 DB000000 	   .long    snop    #10
+  55              	
+  56 10084 69000000 	   .long    orr     #11 or Rd,Rs
+  57              	
+  58 10088 DB000000 	   .long    snop    #12
+  59 1008c DB000000 	   .long    snop    #13
+  60 10090 DB000000 	   .long    snop    #14
+  61 10094 DB000000 	   .long    snop    #15
+  62              	
+  63 10098 8F000000 	   .long    eorr    #16 eor Rd,Rs
+  64              	
+  65 1009c DB000000 	   .long    snop    #17
+  66 100a0 DB000000 	   .long    snop    #18
+  67 100a4 DB000000 	   .long    snop    #19
+  68 100a8 DB000000 	   .long    snop    #1A
+  69 100ac DB000000 	   .long    snop    #1B
+  70 100b0 DB000000 	   .long    snop    #1C
+  71 100b4 DB000000 	   .long    snop    #1D
+  72 100b8 DB000000 	   .long    snop    #1E
+  73 100bc DB000000 	   .long    snop    #1F
+  74 100c0 DB000000 	   .long    snop    #20
+  75 100c4 DB000000 	   .long    snop    #21
+  76 100c8 DB000000 	   .long    snop    #22
+  77 100cc DB000000 	   .long    snop    #23
+  78 100d0 DB000000 	   .long    snop    #24
+  79 100d4 DB000000 	   .long    snop    #25
+  80              	
+  81 100d8 B5000000 	   .long    addr    #26 add Rd,Rs
+  82              	
+  83              	    .rept 256-((.-optbl)/4)
+  84              	    .long   snop
+  85 100dc DB000000 	    .endr
+  85      DB000000 
+  85      DB000000 
+  85      DB000000 
+  85      DB000000 
+  86              	#==========================================================
+  87              	#
+  88              	#   Misc. data follows
+  89              	#
+  90              	#==========================================================
+  91              	# Control String for op-codes not yet implemented
+  92 10440 4E6F7420 	nostr: .string "Not Implemented: %d\n"
+  92      496D706C 
+  92      656D656E 
+  92      7465643A 
+  92      2025640A 
+  93              	# Temporary storage for simulated IP
+  94 10455 00000000 	ipsv:    .long    0
+  95              	#**********************************************************
+  96              	#
+  97              	#   Simulator CPU: Fetch, Decode, Execute
+  98              	#
+GAS LISTING cpuFun.s 			page 3
+
+
+  99              	#**********************************************************
+ 100              	    .globl _start
+ 101              	    .section .text
+ 102              	_start:
+ 103 0000 BF000000 	    movl     $0,%edi         	 #Our simulated ip
+ 103      00
+ 104              	fetch:
+ 105 0005 8A043D00 	    movb     smem(,%edi,1),%al	 #Fetch opcode
+ 105      000000
+ 106 000c 25FF0000 	    andl     $0xff,%eax      	 #Clear high-order bytes
+ 106      00
+ 107 0011 8B048540 	    movl     optbl(,%eax,4),%eax #Decode: get address of routine
+ 107      000100
+ 108 0018 47       	    incl     %edi            	 #Bump ip to second instruction byte
+ 109 0019 FFD0     	    call     *%eax           	 #Execute the instruction
+ 110              	                     		 #Instructions must leave ip
+ 111              	                     		 #pointing to next opcode
+ 112 001b EBE8     	    jmp fetch            	 #It's a cpu, do forever!
+ 113              	#===================================================================
+ 114              	#
+ 115              	#          Instruction Execution Routines
+ 116              	#
+ 117              	#===================================================================
+ 118              	#-------------------------------------------------------------------
+ 119              	#
+ 120              	#          ldr -- ld Rd,Rs Move 32 bits from source-dest register
+ 121              	#
+ 122              	#-------------------------------------------------------------------
+ 123              	ldr:
+ 124 001d 8A043D00 	     movb     smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 124      000000
+ 125 0024 25FF0000 	     andl     $0xff,%eax         #Clear high bits
+ 125      00
+ 126 0029 89C3     	     movl     %eax,%ebx          #Make copy for source
+ 127 002b C1F804   	     sarl     $4,%eax            #Isolate Rd index in %eax
+ 128 002e 83E30F   	     andl     $0x0f,%ebx         #Isolate Rs index in %ebx
+ 129 0031 8B1C9D00 	     movl     regs(,%ebx,4),%ebx #Get data from Rs
+ 129      000100
+ 130 0038 891C8500 	     movl     %ebx,regs(,%eax,4) #Store into Rd
+ 130      000100
+ 131 003f 83C701   	     addl     $1,%edi            #Adjust Instruction Pointer
+ 132 0042 C3       	     ret                         #Return to fetch
+ 133              	#------------------------------------------------------------------
+ 134              	#
+ 135              	#	 andr -- and Rd,Rs
+ 136              	#
+ 137              	#-----------------------------------------------------------------
+ 138              	andr:
+ 139 0043 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 139      000000
+ 140 004a 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 140      00
+ 141 004f 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 142 0051 C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+ 143 0054 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 144 0057 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 144      000100
+GAS LISTING cpuFun.s 			page 4
+
+
+ 145 005e 211C8500 	      andl    %ebx,regs(,%eax,4) #Store into Rd
+ 145      000100
+ 146 0065 83C701   	      addl    $1,%edi            #Adjust Instruction Pointer
+ 147 0068 C3       	      ret                        #Return to fetch
+ 148              	#------------------------------------------------------------------
+ 149              	#
+ 150              	#	 orr -- or Rd,Rs
+ 151              	#
+ 152              	#-----------------------------------------------------------------
+ 153              	orr:
+ 154 0069 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 154      000000
+ 155 0070 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 155      00
+ 156 0075 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 157 0077 C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+ 158 007a 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 159 007d 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 159      000100
+ 160 0084 091C8500 	      orl     %ebx,regs(,%eax,4) #Store into Rd
+ 160      000100
+ 161 008b 83C701   	      addl   $1,%edi             #Adjust Instruction Pointer
+ 162 008e C3       	      ret                        #Return to fetch
+ 163              	#------------------------------------------------------------------
+ 164              	#
+ 165              	#	 eorr -- xor Rd,Rs
+ 166              	#
+ 167              	#-----------------------------------------------------------------
+ 168              	eorr:
+ 169 008f 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 169      000000
+ 170 0096 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 170      00
+ 171 009b 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 172 009d C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+ 173 00a0 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 174 00a3 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 174      000100
+ 175 00aa 311C8500 	      xorl    %ebx,regs(,%eax,4) #Store into Rd
+ 175      000100
+ 176 00b1 83C701   	      addl    $1,%edi            #Adjust Instruction Pointer
+ 177 00b4 C3       	      ret                        #Return to fetch
+ 178              	#------------------------------------------------------------------
+ 179              	#
+ 180              	#	 addr -- add Rd,Rs
+ 181              	#
+ 182              	#-----------------------------------------------------------------
+ 183              	addr:
+ 184 00b5 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 184      000000
+ 185 00bc 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 185      00
+ 186 00c1 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 187 00c3 C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+ 188 00c6 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 189 00c9 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 189      000100
+GAS LISTING cpuFun.s 			page 5
+
+
+ 190 00d0 011C8500 	      addl    %ebx,regs(,%eax,4) #Store into Rd
+ 190      000100
+ 191 00d7 83C701   	      addl    $1,%edi            #Adjust Instruction Pointer
+ 192 00da C3       	      ret                        #Return to fetch
+ 193              	#------------------------------------------------------------------
+ 194              	#
+ 195              	#   snop -- Simulator No Operation
+ 196              	#
+ 197              	#------------------------------------------------------------------
+ 198              	snop:
+ 199 00db 6A00     	     pushl    $0    #Print its own op-code
+ 200 00dd EB04     	     jmp notimp
+ 201              	rinit:              #Robot init
+ 202              	rsens:              #Read Sensors
+ 203              	rspeed:             #Robot Speed
+ 204 00df 6A01     	     pushl    $1
+ 205 00e1 EB00     	     jmp notimp
+ 206              	#------------------------------------------------------------------
+ 207              	#
+ 208              	#   Notimp: Default operation for operations not implemented
+ 209              	#   Should never happen in actual program, represents an
+ 210              	#   error. Treat as no-op for now.
+ 211              	#
+ 212              	#------------------------------------------------------------------
+ 213              	notimp:
+ 214 00e3 893D5504 	     movl     %edi,ipsv     #In case printf changes ip
+ 214      0100
+ 215 00e9 68400401 	     push     $nostr        #Pointer to control string
+ 215      00
+ 216 00ee E8FCFFFF 	call printf
+ 216      FF
+ 217 00f3 83C408   	addl $8,%esp
+ 218 00f6 8B3D5504 	movl ipsv,%edi #Restore simulator ip
+ 218      0100
+ 219 00fc 83C701   	addl $1,%edi   #Bump ip to next op code
+ 220 00ff C3       	ret
+ 221              	
+GAS LISTING cpuFun.s 			page 6
+
+
+DEFINED SYMBOLS
+            cpuFun.s:7      .data:0000000000000000 smem
+            cpuFun.s:17     .data:0000000000010000 regs
+            cpuFun.s:33     .data:0000000000010040 optbl
+            cpuFun.s:198    .text:00000000000000db snop
+            cpuFun.s:123    .text:000000000000001d ldr
+            cpuFun.s:138    .text:0000000000000043 andr
+            cpuFun.s:153    .text:0000000000000069 orr
+            cpuFun.s:168    .text:000000000000008f eorr
+            cpuFun.s:183    .text:00000000000000b5 addr
+            cpuFun.s:92     .data:0000000000010440 nostr
+            cpuFun.s:94     .data:0000000000010455 ipsv
+            cpuFun.s:102    .text:0000000000000000 _start
+            cpuFun.s:104    .text:0000000000000005 fetch
+            cpuFun.s:213    .text:00000000000000e3 notimp
+            cpuFun.s:201    .text:00000000000000df rinit
+            cpuFun.s:202    .text:00000000000000df rsens
+            cpuFun.s:203    .text:00000000000000df rspeed
+
+UNDEFINED SYMBOLS
+printf

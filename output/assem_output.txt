@@ -1,0 +1,805 @@
+GAS LISTING cpu_program.s 			page 1
+
+
+   1              	   .section .data
+   2              	#==========================================================
+   3              	#
+   4              	#   Simulator Memory, 16bit address, 64K max
+   5              	#
+   6              	#==========================================================
+   7              	smem:
+   8              	    .rept 65536/2
+   9              	    .byte 0x29,0x10
+  10 0000 29102910 	    .endr
+  10      29102910 
+  10      29102910 
+  10      29102910 
+  10      29102910 
+  11              	#==========================================================
+  12              	#
+  13              	#   Simulator registers, 16 32-bit registers
+  14              	#   Initialized to zero on "boot"
+  15              	#
+  16              	#==========================================================
+  17              	regs:
+  18 10000 00000000 	    .long 0
+  19 10004 01000000 	    .long 1
+  20              	    .rept 14
+  21              	    .long 0
+  22 10008 00000000 	    .endr
+  22      00000000 
+  22      00000000 
+  22      00000000 
+  22      00000000 
+  23              	#==========================================================
+  24              	#
+  25              	#   Operation dispatch table, one/op-code, 256 max
+  26              	#
+  27              	#   Rd=Destination Register (0-15)
+  28              	#   Rs=Source Register (0-15)
+  29              	#   Memory has a 16-bit address space, high-order
+  30              	#   bits of any indirect operation discarded
+  31              	#
+  32              	#==========================================================
+  33              	optbl:
+  34 10040 88040000 	    .long   snop        #00 Robot init
+  35 10044 88040000 	    .long   snop        #01 Read Sensors
+  36 10048 88040000 	    .long   snop        #02 Robot Speed, Rr,Rl
+  37 1004c 88040000 	    .long   snop        #03 Robot Speed Imm
+  38              	
+  39 10050 1D000000 	   .long    ldr    #04 ld Rd,Rs
+  40 10054 DB000000 	   .long    ldi    #05 immediate to register
+  41 10058 80010000 	   .long    ldm    #06 memory address to register
+  42 1005c 6B020000 	   .long    ldmr    #07 memory addr + register to register
+  43 10060 88040000 	   .long    snop    #08
+  44              	   
+  45 10064 88040000 	   .long    snop    #09
+  46 10068 88040000 	   .long    snop    #0A
+  47 1006c 88040000 	   .long    snop    #0B
+  48              	
+  49 10070 43000000 	   .long    andr    #0C and Rd,Rs
+GAS LISTING cpu_program.s 			page 2
+
+
+  50 10074 FC000000 	   .long    andi    #0D immediate to register
+  51 10078 AF010000 	   .long    andm    #0E memory address to register
+  52 1007c A6020000 	   .long    andmr    #0F memory addr + register to register
+  53 10080 88040000 	   .long    snop    #10
+  54              	
+  55 10084 69000000 	   .long    orr     #11 or Rd,Rs
+  56 10088 1D010000 	   .long    ori    #12 immediate to register
+  57 1008c DE010000 	   .long    orm    #13 memory address to register
+  58 10090 E1020000 	   .long    ormr    #14 memory addr + register to register
+  59 10094 88040000 	   .long    snop    #15
+  60              	
+  61 10098 8F000000 	   .long    eorr    #16 eor Rd,Rs
+  62 1009c 3E010000 	   .long    eori    #17 immediate to register
+  63 100a0 0D020000 	   .long    eorm    #18 memory address to register
+  64 100a4 1C030000 	   .long    eormr    #19 memory addr + register to register
+  65 100a8 88040000 	   .long    snop    #1A
+  66              	   
+  67 100ac 88040000 	   .long    snop    #1B
+  68              	   
+  69 100b0 92030000 	   .long    sjmp    #1C
+  70 100b4 A2030000 	   .long    jmpgtrr    #1D
+  71 100b8 DF030000 	   .long    jmpltrr    #1E
+  72 100bc 1C040000 	   .long    jmpeqrr    #1F
+  73 100c0 59040000 	   .long    jmpezrr    #20
+  74 100c4 88040000 	   .long    snop    #21
+  75 100c8 88040000 	   .long    snop    #22
+  76 100cc 88040000 	   .long    snop    #23
+  77 100d0 88040000 	   .long    snop    #24
+  78 100d4 88040000 	   .long    snop    #25
+  79              	
+  80 100d8 B5000000 	   .long    addr    #26 add Rd,Rs
+  81 100dc 5F010000 	   .long    addi    #27 immediate to register
+  82 100e0 3C020000 	   .long    addm    #28 memory adrress to register
+  83 100e4 57030000 	   .long    addmr   #29 memory addr + register to register
+  84 100e8 88040000 	   .long    snop    #2A
+  85              	
+  86              	    .rept 256-((.-optbl)/4)
+  87              	    .long   snop
+  88 100ec 88040000 	    .endr
+  88      88040000 
+  88      88040000 
+  88      88040000 
+  88      88040000 
+  89              	#==========================================================
+  90              	#
+  91              	#   Misc. data follows
+  92              	#
+  93              	#==========================================================
+  94              	# Control String for op-codes not yet implemented
+  95 10440 4E6F7420 	nostr: .string "Not Implemented: %d\n"
+  95      496D706C 
+  95      656D656E 
+  95      7465643A 
+  95      2025640A 
+  96              	# Temporary storage for simulated IP
+  97 10455 00000000 	ipsv:    .long    0
+  98              	#**********************************************************
+GAS LISTING cpu_program.s 			page 3
+
+
+  99              	#
+ 100              	#   Simulator CPU: Fetch, Decode, Execute
+ 101              	#
+ 102              	#**********************************************************
+ 103              	    .globl _start
+ 104              	    .section .text
+ 105              	_start:
+ 106 0000 BF000000 	    movl     $0,%edi         	 #Our simulated ip
+ 106      00
+ 107              	fetch:
+ 108 0005 8A043D00 	    movb     smem(,%edi,1),%al	 #Fetch opcode
+ 108      000000
+ 109 000c 25FF0000 	    andl     $0xff,%eax      	 #Clear high-order bytes
+ 109      00
+ 110 0011 8B048540 	    movl     optbl(,%eax,4),%eax #Decode: get address of routine
+ 110      000100
+ 111 0018 47       	    incl     %edi            	 #Bump ip to second instruction byte
+ 112 0019 FFD0     	    call     *%eax           	 #Execute the instruction
+ 113              	                     		 #Instructions must leave ip
+ 114              	                     		 #pointing to next opcode
+ 115 001b EBE8     	    jmp fetch            	 #It's a cpu, do forever!
+ 116              	#===================================================================
+ 117              	#
+ 118              	#          Instruction Execution Routines
+ 119              	#
+ 120              	#===================================================================
+ 121              	#-------------------------------------------------------------------
+ 122              	#
+ 123              	#          ldr -- ld Rd,Rs Move 32 bits from source-dest register
+ 124              	#
+ 125              	#-------------------------------------------------------------------
+ 126              	ldr:
+ 127 001d 8A043D00 	     movb     smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 127      000000
+ 128 0024 25FF0000 	     andl     $0xff,%eax         #Clear high bits
+ 128      00
+ 129 0029 89C3     	     movl     %eax,%ebx          #Make copy for source
+ 130 002b C1F804   	     sarl     $4,%eax            #Isolate Rd index in %eax
+ 131 002e 83E30F   	     andl     $0x0f,%ebx         #Isolate Rs index in %ebx
+ 132 0031 8B1C9D00 	     movl     regs(,%ebx,4),%ebx #Get data from Rs
+ 132      000100
+ 133 0038 891C8500 	     movl     %ebx,regs(,%eax,4) #Store into Rd
+ 133      000100
+ 134 003f 83C701   	     addl     $1,%edi            #Adjust Instruction Pointer
+ 135 0042 C3       	     ret                         #Return to fetch
+ 136              	#------------------------------------------------------------------
+ 137              	#
+ 138              	#	 andr -- and Rd,Rs
+ 139              	#
+ 140              	#-----------------------------------------------------------------
+ 141              	andr:
+ 142 0043 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 142      000000
+ 143 004a 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 143      00
+ 144 004f 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 145 0051 C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+GAS LISTING cpu_program.s 			page 4
+
+
+ 146 0054 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 147 0057 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 147      000100
+ 148 005e 211C8500 	      andl    %ebx,regs(,%eax,4) #Store into Rd
+ 148      000100
+ 149 0065 83C701   	      addl    $1,%edi            #Adjust Instruction Pointer
+ 150 0068 C3       	      ret                        #Return to fetch
+ 151              	#------------------------------------------------------------------
+ 152              	#
+ 153              	#	 orr -- or Rd,Rs
+ 154              	#
+ 155              	#-----------------------------------------------------------------
+ 156              	orr:
+ 157 0069 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 157      000000
+ 158 0070 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 158      00
+ 159 0075 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 160 0077 C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+ 161 007a 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 162 007d 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 162      000100
+ 163 0084 091C8500 	      orl     %ebx,regs(,%eax,4) #Store into Rd
+ 163      000100
+ 164 008b 83C701   	      addl   $1,%edi             #Adjust Instruction Pointer
+ 165 008e C3       	      ret                        #Return to fetch
+ 166              	#------------------------------------------------------------------
+ 167              	#
+ 168              	#	 eorr -- xor Rd,Rs
+ 169              	#
+ 170              	#-----------------------------------------------------------------
+ 171              	eorr:
+ 172 008f 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 172      000000
+ 173 0096 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 173      00
+ 174 009b 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 175 009d C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+ 176 00a0 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 177 00a3 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 177      000100
+ 178 00aa 311C8500 	      xorl    %ebx,regs(,%eax,4) #Store into Rd
+ 178      000100
+ 179 00b1 83C701   	      addl    $1,%edi            #Adjust Instruction Pointer
+ 180 00b4 C3       	      ret                        #Return to fetch
+ 181              	#------------------------------------------------------------------
+ 182              	#
+ 183              	#	 addr -- add Rd,Rs
+ 184              	#
+ 185              	#-----------------------------------------------------------------
+ 186              	addr:
+ 187 00b5 8A043D00 	      movb    smem(,%edi,1),%al  #Get Rd,Rs in temp reg
+ 187      000000
+ 188 00bc 25FF0000 	      andl    $0xff,%eax         #Clear high bits
+ 188      00
+ 189 00c1 89C3     	      movl    %eax,%ebx          #Make copy for source
+ 190 00c3 C1F804   	      sarl    $4,%eax            #Isolate Rd index in %eax
+GAS LISTING cpu_program.s 			page 5
+
+
+ 191 00c6 83E30F   	      andl    $0x0f,%ebx         #Isolate Rs index in %ebx
+ 192 00c9 8B1C9D00 	      movl    regs(,%ebx,4),%ebx #Get data from Rs
+ 192      000100
+ 193 00d0 011C8500 	      addl    %ebx,regs(,%eax,4) #Store into Rd
+ 193      000100
+ 194 00d7 83C701   	      addl    $1,%edi            #Adjust Instruction Pointer
+ 195 00da C3       	      ret                        #Return to fetch
+ 196              	#-------------------------------------------------------------------
+ 197              	#
+ 198              	#          ldi -- load immediate
+ 199              	#
+ 200              	#-------------------------------------------------------------------
+ 201              	ldi:
+ 202 00db 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 202      000000
+ 203 00e2 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 203      00
+ 204 00e7 C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 205 00ea 8B1C3D01 	    movl    smem+1(,%edi,1),%ebx
+ 205      000000
+ 206 00f1 891C8500 	    movl    %ebx,regs(,%eax,4)  #Store into Rd
+ 206      000100
+ 207 00f8 83C705   	    addl    $5,%edi             #Adjust Instruction Pointer
+ 208 00fb C3       	    ret                         #Return to fetch
+ 209              	#-------------------------------------------------------------------
+ 210              	#
+ 211              	#          andi -- ld Rd,Rs Move 32 bits from source-dest register
+ 212              	#
+ 213              	#-------------------------------------------------------------------
+ 214              	andi:
+ 215 00fc 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 215      000000
+ 216 0103 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 216      00
+ 217 0108 C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 218 010b 8B1C3D01 	    movl    smem+1(,%edi,1),%ebx
+ 218      000000
+ 219 0112 211C8500 	    andl    %ebx,regs(,%eax,4)
+ 219      000100
+ 220 0119 83C705   	    addl    $5,%edi
+ 221 011c C3       	    ret
+ 222              	#-------------------------------------------------------------------
+ 223              	#
+ 224              	#          ori -- ld Rd,Rs Move 32 bits from source-dest register
+ 225              	#
+ 226              	#-------------------------------------------------------------------
+ 227              	ori:
+ 228 011d 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 228      000000
+ 229 0124 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 229      00
+ 230 0129 C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 231 012c 8B1C3D01 	    movl    smem+1(,%edi,1),%ebx
+ 231      000000
+ 232 0133 091C8500 	    orl    %ebx,regs(,%eax,4)
+ 232      000100
+ 233 013a 83C705   	    addl    $5,%edi
+GAS LISTING cpu_program.s 			page 6
+
+
+ 234 013d C3       	    ret
+ 235              	#-------------------------------------------------------------------
+ 236              	#
+ 237              	#          eori -- ld Rd,Rs Move 32 bits from source-dest register
+ 238              	#
+ 239              	#-------------------------------------------------------------------
+ 240              	eori:
+ 241 013e 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 241      000000
+ 242 0145 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 242      00
+ 243 014a C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 244 014d 8B1C3D01 	    movl    smem+1(,%edi,1),%ebx
+ 244      000000
+ 245 0154 311C8500 	    xorl    %ebx,regs(,%eax,4)
+ 245      000100
+ 246 015b 83C705   	    addl    $5,%edi
+ 247 015e C3       	    ret
+ 248              	#-------------------------------------------------------------------
+ 249              	#
+ 250              	#          addi -- ld Rd,Rs Move 32 bits from source-dest register
+ 251              	#
+ 252              	#-------------------------------------------------------------------
+ 253              	addi:
+ 254 015f 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 254      000000
+ 255 0166 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 255      00
+ 256 016b C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 257 016e 8B1C3D01 	    movl    smem+1(,%edi,1),%ebx
+ 257      000000
+ 258 0175 011C8500 	    addl    %ebx,regs(,%eax,4)
+ 258      000100
+ 259 017c 83C705   	    addl    $5,%edi
+ 260 017f C3       	    ret
+ 261              	#-------------------------------------------------------------------
+ 262              	#
+ 263              	#          ldm -- load to memory
+ 264              	#
+ 265              	#-------------------------------------------------------------------
+ 266              	ldm:
+ 267 0180 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 267      000000
+ 268 0187 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 268      00
+ 269 018c C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 270 018f 668B1C3D 	    movw    smem+1(,%edi,1),%bx
+ 270      01000000 
+ 271 0197 81E3FFFF 	    andl    $0xffff,%ebx
+ 271      0000
+ 272 019d 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 272      000000
+ 273 01a4 891C8500 	    movl    %ebx,regs(,%eax,4)
+ 273      000100
+ 274 01ab 83C703   	    addl    $3,%edi
+ 275 01ae C3       	    ret
+ 276              	#-------------------------------------------------------------------
+GAS LISTING cpu_program.s 			page 7
+
+
+ 277              	#
+ 278              	#          andm -- ld Rd,Rs Move 32 bits from source-dest register
+ 279              	#
+ 280              	#-------------------------------------------------------------------
+ 281              	andm:
+ 282 01af 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 282      000000
+ 283 01b6 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 283      00
+ 284 01bb C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 285 01be 668B1C3D 	    movw    smem+1(,%edi,1),%bx
+ 285      01000000 
+ 286 01c6 81E3FFFF 	    andl    $0xffff,%ebx
+ 286      0000
+ 287 01cc 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 287      000000
+ 288 01d3 211C8500 	    andl    %ebx,regs(,%eax,4)
+ 288      000100
+ 289 01da 83C703   	    addl    $3,%edi
+ 290 01dd C3       	    ret
+ 291              	#-------------------------------------------------------------------
+ 292              	#
+ 293              	#          orm -- ld Rd,Rs Move 32 bits from source-dest register
+ 294              	#
+ 295              	#-------------------------------------------------------------------
+ 296              	orm:
+ 297 01de 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 297      000000
+ 298 01e5 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 298      00
+ 299 01ea C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 300 01ed 668B1C3D 	    movw    smem+1(,%edi,1),%bx
+ 300      01000000 
+ 301 01f5 81E3FFFF 	    andl    $0xffff,%ebx
+ 301      0000
+ 302 01fb 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 302      000000
+ 303 0202 091C8500 	    orl    %ebx,regs(,%eax,4)
+ 303      000100
+ 304 0209 83C703   	    addl    $3,%edi
+ 305 020c C3       	    ret
+ 306              	#-------------------------------------------------------------------
+ 307              	#
+ 308              	#          eorm -- ld Rd,Rs Move 32 bits from source-dest register
+ 309              	#
+ 310              	#-------------------------------------------------------------------
+ 311              	eorm:
+ 312 020d 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 312      000000
+ 313 0214 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 313      00
+ 314 0219 C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 315 021c 668B1C3D 	    movw    smem+1(,%edi,1),%bx
+ 315      01000000 
+ 316 0224 81E3FFFF 	    andl    $0xffff,%ebx
+ 316      0000
+ 317 022a 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+GAS LISTING cpu_program.s 			page 8
+
+
+ 317      000000
+ 318 0231 311C8500 	    xorl    %ebx,regs(,%eax,4)
+ 318      000100
+ 319 0238 83C703   	    addl    $3,%edi
+ 320 023b C3       	    ret
+ 321              	#-------------------------------------------------------------------
+ 322              	#
+ 323              	#          addm -- ld Rd,Rs Move 32 bits from source-dest register
+ 324              	#
+ 325              	#-------------------------------------------------------------------
+ 326              	addm:
+ 327 023c 8A043D00 	    movb    smem(,%edi,1),%al   #Get Rd,Rs in temp reg
+ 327      000000
+ 328 0243 25FF0000 	    andl    $0xff,%eax          #Clear high bits
+ 328      00
+ 329 0248 C1F804   	    sarl    $4,%eax             #Isolate Rd index in %eax
+ 330 024b 668B1C3D 	    movw    smem+1(,%edi,1),%bx
+ 330      01000000 
+ 331 0253 81E3FFFF 	    andl    $0xffff,%ebx
+ 331      0000
+ 332 0259 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 332      000000
+ 333 0260 011C8500 	    addl    %ebx,regs(,%eax,4)
+ 333      000100
+ 334 0267 83C703   	    addl    $3,%edi
+ 335 026a C3       	    ret
+ 336              	#-------------------------------------------------------------------
+ 337              	#
+ 338              	#          ldmr -- load memory indexed
+ 339              	#
+ 340              	#-------------------------------------------------------------------
+ 341              	ldmr:
+ 342 026b 8A043D00 	    movb    smem(,%edi,1),%al
+ 342      000000
+ 343 0272 25FF0000 	    andl    $0xff,%eax
+ 343      00
+ 344 0277 89C3     	    movl    %eax,%ebx
+ 345 0279 C1F804   	    sarl    $4,%eax
+ 346 027c 83E30F   	    andl    $0x0f,%ebx
+ 347 027f 8B1C9D00 	    movl    regs(,%ebx,4),%ebx
+ 347      000100
+ 348 0286 66031C3D 	    addw    smem+1(,%edi,1),%bx
+ 348      01000000 
+ 349 028e 81E3FFFF 	    andl    $0xffff,%ebx
+ 349      0000
+ 350 0294 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 350      000000
+ 351 029b 891C8500 	    movl    %ebx,regs(,%eax,4)
+ 351      000100
+ 352 02a2 83C703   	    addl    $3,%edi
+ 353 02a5 C3       	    ret
+ 354              	#-------------------------------------------------------------------
+ 355              	#
+ 356              	#          andmr -- ld Rd,Rs Move 32 bits from source-dest register
+ 357              	#
+ 358              	#-------------------------------------------------------------------
+ 359              	andmr:
+GAS LISTING cpu_program.s 			page 9
+
+
+ 360 02a6 8A043D00 	    movb    smem(,%edi,1),%al
+ 360      000000
+ 361 02ad 25FF0000 	    andl    $0xff,%eax
+ 361      00
+ 362 02b2 89C3     	    movl    %eax,%ebx
+ 363 02b4 C1F804   	    sarl    $4,%eax
+ 364 02b7 83E30F   	    andl    $0x0f,%ebx
+ 365 02ba 8B1C9D00 	    movl    regs(,%ebx,4),%ebx
+ 365      000100
+ 366 02c1 66031C3D 	    addw    smem+1(,%edi,1),%bx
+ 366      01000000 
+ 367 02c9 81E3FFFF 	    andl    $0xffff,%ebx
+ 367      0000
+ 368 02cf 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 368      000000
+ 369 02d6 211C8500 	    andl    %ebx,regs(,%eax,4)
+ 369      000100
+ 370 02dd 83C703   	    addl    $3,%edi
+ 371 02e0 C3       	    ret
+ 372              	#-------------------------------------------------------------------
+ 373              	#
+ 374              	#          ormr -- ld Rd,Rs Move 32 bits from source-dest register
+ 375              	#
+ 376              	#-------------------------------------------------------------------
+ 377              	ormr:
+ 378 02e1 8A043D00 	    movb    smem(,%edi,1),%al
+ 378      000000
+ 379 02e8 25FF0000 	    andl    $0xff,%eax
+ 379      00
+ 380 02ed 89C3     	    movl    %eax,%ebx
+ 381 02ef C1F804   	    sarl    $4,%eax
+ 382 02f2 83E30F   	    andl    $0x0f,%ebx
+ 383 02f5 8B1C9D00 	    movl    regs(,%ebx,4),%ebx
+ 383      000100
+ 384 02fc 66031C3D 	    addw    smem+1(,%edi,1),%bx
+ 384      01000000 
+ 385 0304 81E3FFFF 	    andl    $0xffff,%ebx
+ 385      0000
+ 386 030a 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 386      000000
+ 387 0311 091C8500 	    orl    %ebx,regs(,%eax,4)
+ 387      000100
+ 388 0318 83C703   	    addl    $3,%edi
+ 389 031b C3       	    ret
+ 390              	#-------------------------------------------------------------------
+ 391              	#
+ 392              	#          eormr -- ld Rd,Rs Move 32 bits from source-dest register
+ 393              	#
+ 394              	#-------------------------------------------------------------------
+ 395              	eormr:
+ 396 031c 8A043D00 	    movb    smem(,%edi,1),%al
+ 396      000000
+ 397 0323 25FF0000 	    andl    $0xff,%eax
+ 397      00
+ 398 0328 89C3     	    movl    %eax,%ebx
+ 399 032a C1F804   	    sarl    $4,%eax
+ 400 032d 83E30F   	    andl    $0x0f,%ebx
+GAS LISTING cpu_program.s 			page 10
+
+
+ 401 0330 8B1C9D00 	    movl    regs(,%ebx,4),%ebx
+ 401      000100
+ 402 0337 66031C3D 	    addw    smem+1(,%edi,1),%bx
+ 402      01000000 
+ 403 033f 81E3FFFF 	    andl    $0xffff,%ebx
+ 403      0000
+ 404 0345 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 404      000000
+ 405 034c 311C8500 	    xorl    %ebx,regs(,%eax,4)
+ 405      000100
+ 406 0353 83C703   	    addl    $3,%edi
+ 407 0356 C3       	    ret
+ 408              	#-------------------------------------------------------------------
+ 409              	#
+ 410              	#          addmr -- ld Rd,Rs Move 32 bits from source-dest register
+ 411              	#
+ 412              	#-------------------------------------------------------------------
+ 413              	addmr:
+ 414 0357 8A043D00 	    movb    smem(,%edi,1),%al
+ 414      000000
+ 415 035e 25FF0000 	    andl    $0xff,%eax
+ 415      00
+ 416 0363 89C3     	    movl    %eax,%ebx
+ 417 0365 C1F804   	    sarl    $4,%eax
+ 418 0368 83E30F   	    andl    $0x0f,%ebx
+ 419 036b 8B1C9D00 	    movl    regs(,%ebx,4),%ebx
+ 419      000100
+ 420 0372 66031C3D 	    addw    smem+1(,%edi,1),%bx
+ 420      01000000 
+ 421 037a 81E3FFFF 	    andl    $0xffff,%ebx
+ 421      0000
+ 422 0380 8B1C1D00 	    movl    smem(,%ebx,1),%ebx
+ 422      000000
+ 423 0387 011C8500 	    addl    %ebx,regs(,%eax,4)
+ 423      000100
+ 424 038e 83C703   	    addl    $3,%edi
+ 425 0391 C3       	    ret
+ 426              	#-------------------------------------------------------------------
+ 427              	#
+ 428              	#          sjmp -- jump to memaddr
+ 429              	#
+ 430              	#-------------------------------------------------------------------
+ 431              	sjmp:
+ 432 0392 668B043D 	    movw    smem+1(,%edi,1),%ax
+ 432      01000000 
+ 433 039a 25FFFF00 	    andl    $0xffff,%eax
+ 433      00
+ 434 039f 89C7     	    movl    %eax,%edi
+ 435 03a1 C3       	    ret
+ 436              	#-------------------------------------------------------------------
+ 437              	#
+ 438              	#          jmpgtrr -- jump to memaddr if Rd > Rs
+ 439              	#
+ 440              	#-------------------------------------------------------------------
+ 441              	jmpgtrr:
+ 442 03a2 8A043D00 	        movb    smem(,%edi,1),%al
+ 442      000000
+GAS LISTING cpu_program.s 			page 11
+
+
+ 443 03a9 25FF0000 	        andl    $0xff,%eax
+ 443      00
+ 444 03ae 89C3     	        movl    %eax,%ebx
+ 445 03b0 C1F804   	        sarl    $4,%eax             #index of Rd
+ 446 03b3 81E3FF00 	        andl    $0xff,%ebx          #index of Rs
+ 446      0000
+ 447              	        
+ 448 03b9 8B048500 	        movl    regs(,%eax,4),%eax  #content of Rd
+ 448      000100
+ 449 03c0 8B1C9D00 	        movl    regs(,%ebx,4),%ebx  #content of Rs
+ 449      000100
+ 450 03c7 39D8     	        cmpl    %ebx,%eax
+ 451 03c9 7E10     	        jle     jmpgtrrxit
+ 452              	        
+ 453 03cb 668B043D 	        movw    smem+1(,%edi,1),%ax
+ 453      01000000 
+ 454 03d3 25FFFF00 	        andl    $0xffff,%eax
+ 454      00
+ 455 03d8 89C7     	        movl    %eax,%edi
+ 456 03da C3       	        ret
+ 457              	        
+ 458              	jmpgtrrxit:
+ 459 03db 83C703   	          addl  $3,%edi
+ 460 03de C3       	          ret
+ 461              	#-------------------------------------------------------------------
+ 462              	#
+ 463              	#          jmplttrr -- jump to memaddr if Rd < Rs
+ 464              	#
+ 465              	#-------------------------------------------------------------------
+ 466              	jmpltrr:
+ 467 03df 8A043D00 	        movb    smem(,%edi,1),%al
+ 467      000000
+ 468 03e6 25FF0000 	        andl    $0xff,%eax
+ 468      00
+ 469 03eb 89C3     	        movl    %eax,%ebx
+ 470 03ed C1F804   	        sarl    $4,%eax             #index of Rd
+ 471 03f0 81E3FF00 	        andl    $0xff,%ebx          #index of Rs
+ 471      0000
+ 472              	        
+ 473 03f6 8B048500 	        movl    regs(,%eax,4),%eax  #content of Rd
+ 473      000100
+ 474 03fd 8B1C9D00 	        movl    regs(,%ebx,4),%ebx  #content of Rs
+ 474      000100
+ 475 0404 39D8     	        cmpl    %ebx,%eax
+ 476 0406 7D10     	        jge     jmpltrrxit
+ 477              	        
+ 478 0408 668B043D 	        movw    smem+1(,%edi,1),%ax
+ 478      01000000 
+ 479 0410 25FFFF00 	        andl    $0xffff,%eax
+ 479      00
+ 480 0415 89C7     	        movl    %eax,%edi
+ 481 0417 C3       	        ret
+ 482              	        
+ 483              	jmpltrrxit:
+ 484 0418 83C703   	          addl  $3,%edi
+ 485 041b C3       	          ret
+ 486              	#-------------------------------------------------------------------
+GAS LISTING cpu_program.s 			page 12
+
+
+ 487              	#
+ 488              	#          jmpeqrr -- jump to memaddr if Rd = Rs
+ 489              	#
+ 490              	#-------------------------------------------------------------------
+ 491              	jmpeqrr:
+ 492 041c 8A043D00 	        movb    smem(,%edi,1),%al
+ 492      000000
+ 493 0423 25FF0000 	        andl    $0xff,%eax
+ 493      00
+ 494 0428 89C3     	        movl    %eax,%ebx
+ 495 042a C1F804   	        sarl    $4,%eax             #index of Rd
+ 496 042d 81E3FF00 	        andl    $0xff,%ebx          #index of Rs
+ 496      0000
+ 497              	        
+ 498 0433 8B048500 	        movl    regs(,%eax,4),%eax  #content of Rd
+ 498      000100
+ 499 043a 8B1C9D00 	        movl    regs(,%ebx,4),%ebx  #content of Rs
+ 499      000100
+ 500 0441 39D8     	        cmpl    %ebx,%eax
+ 501 0443 7410     	        je     jmpeqrrxit
+ 502              	        
+ 503 0445 668B043D 	        movw    smem+1(,%edi,1),%ax
+ 503      01000000 
+ 504 044d 25FFFF00 	        andl    $0xffff,%eax
+ 504      00
+ 505 0452 89C7     	        movl    %eax,%edi
+ 506 0454 C3       	        ret
+ 507              	        
+ 508              	jmpeqrrxit:
+ 509 0455 83C703   	          addl  $3,%edi
+ 510 0458 C3       	          ret
+ 511              	#-------------------------------------------------------------------
+ 512              	#
+ 513              	#          jmpezrr -- jump to memaddr if Rd = 0
+ 514              	#
+ 515              	#-------------------------------------------------------------------
+ 516              	jmpezrr:
+ 517 0459 8A043D00 	        movb    smem(,%edi,1),%al
+ 517      000000
+ 518 0460 25FF0000 	        andl    $0xff,%eax
+ 518      00
+ 519 0465 C1F804   	        sarl    $4,%eax             #index of Rd
+ 520              	        
+ 521 0468 8B048500 	        movl    regs(,%eax,4),%eax  #content of Rd
+ 521      000100
+ 522 046f 83F800   	        cmpl    $0,%eax             #compare to see if zero
+ 523 0472 7410     	        je     jmpezrrxit           #jump to jmpezrrxit
+ 524              	        
+ 525 0474 668B043D 	        movw    smem+1(,%edi,1),%ax
+ 525      01000000 
+ 526 047c 25FFFF00 	        andl    $0xffff,%eax
+ 526      00
+ 527 0481 89C7     	        movl    %eax,%edi
+ 528 0483 C3       	        ret
+ 529              	        
+ 530              	jmpezrrxit:
+ 531 0484 83C703   	          addl  $3,%edi
+GAS LISTING cpu_program.s 			page 13
+
+
+ 532 0487 C3       	          ret
+ 533              	#------------------------------------------------------------------
+ 534              	#
+ 535              	#   snop -- Simulator No Operation
+ 536              	#
+ 537              	#------------------------------------------------------------------
+ 538              	snop:
+ 539 0488 6A00     	     pushl    $0    #Print its own op-code
+ 540 048a EB04     	     jmp notimp
+ 541              	rinit:              #Robot init
+ 542              	rsens:              #Read Sensors
+ 543              	rspeed:             #Robot Speed
+ 544 048c 6A01     	     pushl    $1
+ 545 048e EB00     	     jmp notimp
+ 546              	#------------------------------------------------------------------
+ 547              	#
+ 548              	#   Notimp: Default operation for operations not implemented
+ 549              	#   Should never happen in actual program, represents an
+ 550              	#   error. Treat as no-op for now.
+ 551              	#
+ 552              	#------------------------------------------------------------------
+ 553              	notimp:
+ 554 0490 893D5504 	     movl     %edi,ipsv     #In case printf changes ip
+ 554      0100
+ 555 0496 68400401 	     push     $nostr        #Pointer to control string
+ 555      00
+ 556 049b E8FCFFFF 	call printf
+ 556      FF
+ 557 04a0 83C408   	addl $8,%esp
+ 558 04a3 8B3D5504 	movl ipsv,%edi #Restore simulator ip
+ 558      0100
+ 559 04a9 83C701   	addl $1,%edi   #Bump ip to next op code
+ 560 04ac C3       	ret
+ 561              	
+GAS LISTING cpu_program.s 			page 14
+
+
+DEFINED SYMBOLS
+       cpu_program.s:7      .data:0000000000000000 smem
+       cpu_program.s:17     .data:0000000000010000 regs
+       cpu_program.s:33     .data:0000000000010040 optbl
+       cpu_program.s:538    .text:0000000000000488 snop
+       cpu_program.s:126    .text:000000000000001d ldr
+       cpu_program.s:201    .text:00000000000000db ldi
+       cpu_program.s:266    .text:0000000000000180 ldm
+       cpu_program.s:341    .text:000000000000026b ldmr
+       cpu_program.s:141    .text:0000000000000043 andr
+       cpu_program.s:214    .text:00000000000000fc andi
+       cpu_program.s:281    .text:00000000000001af andm
+       cpu_program.s:359    .text:00000000000002a6 andmr
+       cpu_program.s:156    .text:0000000000000069 orr
+       cpu_program.s:227    .text:000000000000011d ori
+       cpu_program.s:296    .text:00000000000001de orm
+       cpu_program.s:377    .text:00000000000002e1 ormr
+       cpu_program.s:171    .text:000000000000008f eorr
+       cpu_program.s:240    .text:000000000000013e eori
+       cpu_program.s:311    .text:000000000000020d eorm
+       cpu_program.s:395    .text:000000000000031c eormr
+       cpu_program.s:431    .text:0000000000000392 sjmp
+       cpu_program.s:441    .text:00000000000003a2 jmpgtrr
+       cpu_program.s:466    .text:00000000000003df jmpltrr
+       cpu_program.s:491    .text:000000000000041c jmpeqrr
+       cpu_program.s:516    .text:0000000000000459 jmpezrr
+       cpu_program.s:186    .text:00000000000000b5 addr
+       cpu_program.s:253    .text:000000000000015f addi
+       cpu_program.s:326    .text:000000000000023c addm
+       cpu_program.s:413    .text:0000000000000357 addmr
+       cpu_program.s:95     .data:0000000000010440 nostr
+       cpu_program.s:97     .data:0000000000010455 ipsv
+       cpu_program.s:105    .text:0000000000000000 _start
+       cpu_program.s:107    .text:0000000000000005 fetch
+       cpu_program.s:458    .text:00000000000003db jmpgtrrxit
+       cpu_program.s:483    .text:0000000000000418 jmpltrrxit
+       cpu_program.s:508    .text:0000000000000455 jmpeqrrxit
+       cpu_program.s:530    .text:0000000000000484 jmpezrrxit
+       cpu_program.s:553    .text:0000000000000490 notimp
+       cpu_program.s:541    .text:000000000000048c rinit
+       cpu_program.s:542    .text:000000000000048c rsens
+       cpu_program.s:543    .text:000000000000048c rspeed
+
+UNDEFINED SYMBOLS
+printf

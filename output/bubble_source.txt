@@ -1,0 +1,167 @@
+GAS LISTING test.s 			page 1
+
+
+   1              	 .section .data
+   2              	
+   3              	data_items:
+   4 0000 03000000 	 .long 3,1,87,45,90,23,67,34,9,0
+   4      01000000 
+   4      57000000 
+   4      2D000000 
+   4      5A000000 
+   5              	
+   6              	array_len:			# Array length value will be helf in %ecx
+   7 0028 09000000 	 .long 9
+   8              	
+   9              	print_string:
+  10 002c 56616C75 	 .asciz "Values: %d\n"
+  10      65733A20 
+  10      25640A00 
+  11              	
+  12              	 .section .text
+  13              	 .globl _start
+  14              	
+  15              	_start:
+  16 0000 BF000000 	 movl $0,%edi
+  16      00
+  17 0005 BA000000 	 movl $0,%edx 			# index register to tell program to loop at set amount of times
+  17      00
+  18 000a 8B0CBD28 	 movl array_len(,%edi,4),%ecx	# Moves the length of array into %ecx
+  18      000000
+  19 0011 8B04BD00 	 movl data_items(,%edi,4), %eax
+  19      000000
+  20 0018 89C3     	 movl %eax, %ebx
+  21              	
+  22              	first_print:
+  23 001a 83F800   	 cmpl $0,%eax
+  24 001d 7418     	 je first_print_exit
+  25 001f 50       	 pushl %eax
+  26 0020 682C0000 	 pushl $print_string
+  26      00
+  27 0025 E8FCFFFF 	 call printf
+  27      FF
+  28 002a 83C408   	 addl $8,%esp
+  29 002d 47       	 incl %edi
+  30 002e 8B04BD00 	 movl data_items(,%edi,4),%eax
+  30      000000
+  31 0035 EBE3     	 jmp first_print
+  32              	
+  33              	first_print_exit:
+  34 0037 50       	 pushl %eax
+  35 0038 682C0000 	 pushl $print_string
+  35      00
+  36 003d E8FCFFFF 	 call printf
+  36      FF
+  37 0042 83C408   	 addl $8,%esp
+  38 0045 BF000000 	 movl $0,%edi
+  38      00
+  39 004a 8B04BD00 	 movl data_items(,%edi,4),%eax
+  39      000000
+  40              	
+GAS LISTING test.s 			page 2
+
+
+  41              	start_loop:
+  42 0051 39D1     	 cmpl %edx,%ecx
+  43 0053 7452     	 je start_print
+  44 0055 83F800   	 cmpl $0, %eax
+  45 0058 743C     	 je reloop			# When done sorting will jump to reloop to start over
+  46 005a 47       	 incl %edi
+  47 005b 8B04BD00 	 movl data_items(,%edi,4), %eax
+  47      000000
+  48 0062 E8060000 	 call bsrchswap
+  48      00
+  49 0067 EBE8     	 jmp start_loop
+  50              	
+  51              	reset_loop:
+  52 0069 89C3     	 movl %eax,%ebx
+  53 006b EBE4     	 jmp start_loop
+  54              	
+  55              	bsrchswap:
+  56 006d 39D8     	 cmpl %ebx,%eax
+  57 006f 7FF8     	 jg reset_loop
+  58 0071 50       	 pushl %eax
+  59 0072 53       	 pushl %ebx
+  60 0073 4F       	 decl %edi
+  61 0074 8B04BD00 	 movl data_items(,%edi,4),%eax
+  61      000000
+  62 007b 47       	 incl %edi
+  63 007c 8B1CBD00 	 movl data_items(,%edi,4),%ebx
+  63      000000
+  64 0083 8904BD00 	 movl %eax,data_items(,%edi,4)
+  64      000000
+  65 008a 4F       	 decl %edi
+  66 008b 891CBD00 	 movl %ebx,data_items(,%edi,4)
+  66      000000
+  67 0092 5B       	 popl %ebx			# Restores old value of %ebx
+  68 0093 58       	 popl %eax			# Restores old value of %eax
+  69 0094 47       	 incl %edi
+  70 0095 C3       	 ret
+  71              	
+  72              	reloop:
+  73 0096 42       	 incl %edx
+  74 0097 BF000000 	 movl $0,%edi			# Resetting loop index
+  74      00
+  75 009c 8B04BD00 	 movl data_items(,%edi,4),%eax	# Loading first value in array, again
+  75      000000
+  76 00a3 89C3     	 movl %eax,%ebx
+  77 00a5 EBAA     	 jmp start_loop
+  78              	
+  79              	start_print:
+  80 00a7 BF000000 	 movl $0,%edi
+  80      00
+  81 00ac 8B04BD00 	 movl data_items(,%edi,4),%eax
+  81      000000
+  82              	# movl $0,%edx
+  83              	
+  84              	print_array:
+  85              	# cmpl %edx,%ecx
+  86              	# jl loop_exit
+  87 00b3 83F85A   	 cmpl $90,%eax			# Will probably end the print array too early since the 0 was swapped and is no lo
+GAS LISTING test.s 			page 3
+
+
+  88 00b6 7418     	 je loop_exit
+  89 00b8 50       	 pushl %eax
+  90 00b9 682C0000 	 pushl $print_string
+  90      00
+  91 00be E8FCFFFF 	 call printf
+  91      FF
+  92 00c3 83C408   	 addl $8,%esp
+  93 00c6 47       	 incl %edi
+  94              	# incl %edx
+  95 00c7 8B04BD00 	 movl data_items(,%edi,4),%eax
+  95      000000
+  96 00ce EBE3     	 jmp print_array
+  97              	
+  98              	loop_exit:
+  99 00d0 50       	 pushl %eax			# Printing last value in array that was missed
+ 100 00d1 682C0000 	 pushl $print_string
+ 100      00
+ 101 00d6 E8FCFFFF 	 call printf
+ 101      FF
+ 102 00db 83C408   	 addl $8,%esp
+ 103 00de B8010000 	 movl $1, %eax
+ 103      00
+ 104 00e3 CD80     	 int $0x80
+ 105              	
+GAS LISTING test.s 			page 4
+
+
+DEFINED SYMBOLS
+              test.s:3      .data:0000000000000000 data_items
+              test.s:6      .data:0000000000000028 array_len
+              test.s:9      .data:000000000000002c print_string
+              test.s:15     .text:0000000000000000 _start
+              test.s:22     .text:000000000000001a first_print
+              test.s:33     .text:0000000000000037 first_print_exit
+              test.s:41     .text:0000000000000051 start_loop
+              test.s:79     .text:00000000000000a7 start_print
+              test.s:72     .text:0000000000000096 reloop
+              test.s:55     .text:000000000000006d bsrchswap
+              test.s:51     .text:0000000000000069 reset_loop
+              test.s:84     .text:00000000000000b3 print_array
+              test.s:98     .text:00000000000000d0 loop_exit
+
+UNDEFINED SYMBOLS
+printf

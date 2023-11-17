@@ -1,0 +1,12 @@
+        .byte  0x0C,0x23
+        .byte  0x24,0x40
+        .word  12
+        .byte  0x0C,0x32
+        .byte  0x1C,0x00
+        .word  0
+        .byte  0x0C,0x68
+        .byte  0x25,0x40
+        .rept  65520
+        .byte  0xFF
+        .endr
+        
